@@ -7,6 +7,8 @@ services:
     ports:
       - "7080:8000"
     restart: unless-stopped
+    networks:
+      - web
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -21,4 +23,10 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
 

@@ -1,4 +1,6 @@
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:7080/api`;
+const API_BASE_URL = window.location.port
+    ? `${window.location.protocol}//${window.location.hostname}:7080/api`
+    : `${window.location.origin}/api`;
 
 let gameBoard = [[null, null, null], [null, null, null], [null, null, null]];
 let gameOver = false;
