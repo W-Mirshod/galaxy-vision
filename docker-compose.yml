@@ -4,6 +4,8 @@ services:
   backend:
     build: ./backend
     container_name: tic-tac-toe-backend
+    env_file:
+      - .env
     ports:
       - "7080:8000"
     environment:
