@@ -5,7 +5,7 @@ services:
     build: ./backend
     container_name: tic-tac-toe-backend
     ports:
-      - "8000:8000"
+      - "7080:8000"
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
@@ -20,7 +20,7 @@ services:
     build: ./frontend
     container_name: tic-tac-toe-frontend
     ports:
-      - "80:80"
+      - "9080:80"
     depends_on:
       - backend
     restart: unless-stopped

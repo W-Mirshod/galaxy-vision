@@ -48,12 +48,12 @@ docker-compose up --build
 ```
 
 The application will be available at:
-- Frontend: http://localhost
-- Backend API: http://localhost:8000
+- Frontend: http://localhost:9080
+- Backend API: http://localhost:7080
 
 ### 4. Play the Game
 
-1. Open http://localhost in your browser
+1. Open http://localhost:9080 in your browser
 2. Click on any cell to make your move (X)
 3. The computer will automatically respond (O)
 4. Win to receive a promo code and Telegram notification
