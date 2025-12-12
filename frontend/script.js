@@ -15,6 +15,7 @@ cells.forEach(cell => {
 });
 
 playAgainBtn.addEventListener('click', resetGame);
+resetGame();
 
 async function handleCellClick(event) {
     if (gameOver) return;
@@ -44,9 +45,17 @@ async function handleCellClick(event) {
         const data = await response.json();
         
         if (!data.success) {
+            gameBoard = data.board || gameBoard;
+            updateBoard();
             messageEl.textContent = data.message || 'Invalid move';
-            cell.textContent = '';
-            cell.classList.remove('x', 'disabled');
+            if (data.message && data.message.toLowerCase().includes('game is already over')) {
+                gameOver = true;
+                playAgainContainer.classList.remove('hidden');
+                disableAllCells();
+            } else {
+                cell.textContent = '';
+                cell.classList.remove('x', 'disabled');
+            }
             return;
         }
         
@@ -60,6 +69,7 @@ async function handleCellClick(event) {
                 promoCodeEl.textContent = data.promo_code;
                 promoCodeContainer.classList.remove('hidden');
             }
+            playAgainContainer.classList.remove('hidden');
             disableAllCells();
         } else if (data.winner === 'O') {
             gameOver = true;

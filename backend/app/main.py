@@ -2,11 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import asyncio
 
 from .game_logic import GameState, get_computer_move
 from .promo_code import generate_promo_code
-from .telegram_bot import send_victory_message, send_loss_message
 
 app = FastAPI(title="Tic Tac Toe API")
 
@@ -86,7 +84,6 @@ async def make_move(request: MoveRequest):
     winner = game.check_winner()
     if winner == "X":
         promo_code = generate_promo_code()
-        asyncio.create_task(send_victory_message(promo_code))
         return MoveResponse(
             success=True,
             board=game.board,
@@ -108,7 +105,6 @@ async def make_move(request: MoveRequest):
     
     winner = game.check_winner()
     if winner == "O":
-        asyncio.create_task(send_loss_message())
         return MoveResponse(
             success=True,
             board=game.board,

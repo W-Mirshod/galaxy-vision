@@ -4,13 +4,8 @@ services:
   backend:
     build: ./backend
     container_name: tic-tac-toe-backend
-    env_file:
-      - .env
     ports:
       - "7080:8000"
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
