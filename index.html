@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Galaxy Vision</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  </head>
+  <body>
+    <div id="ui">
+      <div class="row">
+        <label for="mode">Control Mode</label>
+        <select id="mode">
+          <option value="orbit">Orbit</option>
+          <option value="pan">Pan</option>
+          <option value="hybrid">Hybrid</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>
+          <input type="checkbox" id="landmarks" checked />
+          Landmarks
+        </label>
+        <label>
+          <input type="checkbox" id="trails" checked />
+          Trails
+        </label>
+        <label>
+          <input type="checkbox" id="nebulae" checked />
+          Nebulae
+        </label>
+      </div>
+      <div class="row hint" id="hint"></div>
+    </div>
+    <video id="video" playsinline></video>
+    <canvas id="gl"></canvas>
+    <canvas id="overlay"></canvas>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
