@@ -621,7 +621,7 @@ function updateControls() {
   if (hands.length > 0) {
     const primary = hands[0];
     tempHand.set(primary.palm.x, primary.palm.y);
-    smoothedHandPos.lerp(tempHand, 0.08);
+    smoothedHandPos.lerp(tempHand, 0.16);
     const x = smoothedHandPos.x * 2 - 1;
     const y = smoothedHandPos.y * 2 - 1;
     const deadZone = 0.1;
@@ -645,10 +645,7 @@ function updateControls() {
     }
   } else {
     tempHand.set(0.5, 0.5);
-    smoothedHandPos.lerp(tempHand, 0.05);
-    desiredOrbit.set(0.4, 0.9);
-    desiredPan.set(0, 0, 0);
-    targetRoll = THREE.MathUtils.lerp(targetRoll, 0, 0.1);
+    smoothedHandPos.lerp(tempHand, 0.08);
   }
 
   if (hands.length > 1) {
@@ -657,19 +654,19 @@ function updateControls() {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const roll = Math.atan2(dy, dx);
-    targetRoll = THREE.MathUtils.lerp(targetRoll, roll * 0.35, 0.15);
+    targetRoll = THREE.MathUtils.lerp(targetRoll, roll * 0.35, 0.22);
     const avgX = (a.x + b.x) / 2;
     const avgY = (a.y + b.y) / 2;
     tempHand.set(avgX, avgY);
-    smoothedHandPos.lerp(tempHand, 0.1);
+    smoothedHandPos.lerp(tempHand, 0.18);
     const normalizedX = avgX * 2 - 1;
     const normalizedY = avgY * 2 - 1;
     desiredOrbit.x = THREE.MathUtils.clamp(-normalizedY, -1, 1) * 0.6;
     desiredOrbit.y = THREE.MathUtils.clamp(normalizedX, -1, 1) * 0.9;
   }
 
-  targetOrbit.lerp(desiredOrbit, 0.1);
-  targetPan.lerp(desiredPan, 0.1);
+  targetOrbit.lerp(desiredOrbit, 0.2);
+  targetPan.lerp(desiredPan, 0.2);
 
   updateGestures();
   if (hands.length === 0) {
@@ -699,6 +696,7 @@ function updateGestures() {
       gestureFeedback.scatter = 1;
     }
     if (fist) {
+      targetRadius = THREE.MathUtils.clamp(targetRadius - 0.8, 60, 260);
       gestureFeedback.gravity = Math.min(
         1,
         gestureFeedback.gravity + 0.04
@@ -775,7 +773,7 @@ function updateCamera(delta) {
   const newY = currentRadius * Math.cos(phi) + currentPan.y;
   const newZ = currentRadius * Math.sin(phi) * Math.sin(theta) + currentPan.z;
   tempCameraPos.set(newX, newY, newZ);
-  camera.position.lerp(tempCameraPos, 0.2);
+  camera.position.lerp(tempCameraPos, 0.25);
   camera.lookAt(cameraTarget.clone().add(currentPan));
   camera.up.set(Math.sin(currentRoll), Math.cos(currentRoll), 0);
 }
