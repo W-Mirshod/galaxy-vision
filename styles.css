@@ -5,9 +5,10 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #03030a;
+  background: #020205;
   color: #e6ecff;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
+  user-select: none;
 }
 
 #gl,
@@ -28,45 +29,112 @@ body {
 
 #ui {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
+  bottom: 20px;
+  left: 20px;
   z-index: 10;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-radius: 12px;
-  background: rgba(6, 9, 24, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  background: rgba(4, 8, 24, 0.75);
+  border: 1px solid rgba(100, 150, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 220px;
+  gap: 10px;
+  min-width: 200px;
+  transition: all 0.2s ease;
 }
 
-#ui label,
-#ui select {
+#ui:hover {
+  background: rgba(6, 12, 32, 0.85);
+  border-color: rgba(100, 150, 255, 0.2);
+}
+
+#ui label {
   font-size: 13px;
+  font-weight: 400;
+  color: #b0c0ff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+#ui label:hover {
+  color: #d0e0ff;
 }
 
 #ui .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
+#ui label span {
+  font-size: 12px;
+}
+
 #ui select {
-  background: rgba(12, 18, 38, 0.9);
+  background: rgba(20, 30, 60, 0.6);
   color: #e6ecff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 4px 6px;
-  border-radius: 6px;
+  border: 1px solid rgba(100, 150, 255, 0.2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+#ui select:hover {
+  background: rgba(30, 40, 80, 0.8);
+  border-color: rgba(100, 150, 255, 0.4);
 }
 
 #ui input[type="checkbox"] {
-  accent-color: #8ab4ff;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(100, 150, 255, 0.35);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+#ui input[type="checkbox"]:hover {
+  border-color: rgba(100, 150, 255, 0.5);
+}
+
+#ui input[type="checkbox"]:checked {
+  background: #5a9eff;
+  border-color: #5a9eff;
+}
+
+#ui input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 3px;
+  height: 6px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
 }
 
 #ui .hint {
   font-size: 11px;
-  opacity: 0.75;
+  color: #7a9aff;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.01em;
+  opacity: 0.85;
 }

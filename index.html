@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Galaxy Vision</title>
     <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/"
+        }
+      }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -12,7 +20,7 @@
   <body>
     <div id="ui">
       <div class="row">
-        <label for="mode">Control Mode</label>
+        <label for="mode">Mode</label>
         <select id="mode">
           <option value="orbit">Orbit</option>
           <option value="pan">Pan</option>
@@ -22,18 +30,18 @@
       <div class="row">
         <label>
           <input type="checkbox" id="landmarks" checked />
-          Landmarks
+          <span>Skeleton</span>
         </label>
         <label>
-          <input type="checkbox" id="trails" checked />
-          Trails
+          <input type="checkbox" id="camera" checked />
+          <span>Camera</span>
         </label>
         <label>
           <input type="checkbox" id="nebulae" checked />
-          Nebulae
+          <span>Nebulae</span>
         </label>
       </div>
-      <div class="row hint" id="hint"></div>
+      <div class="hint" id="hint"></div>
     </div>
     <video id="video" playsinline></video>
     <canvas id="gl"></canvas>

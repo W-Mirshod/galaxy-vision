@@ -1,32 +1,57 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js";
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 const canvas = document.getElementById("gl");
 const overlay = document.getElementById("overlay");
 const overlayCtx = overlay.getContext("2d");
 const modeSelect = document.getElementById("mode");
 const landmarksToggle = document.getElementById("landmarks");
-const trailsToggle = document.getElementById("trails");
+const cameraToggle = document.getElementById("camera");
 const nebulaeToggle = document.getElementById("nebulae");
 const hint = document.getElementById("hint");
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
-  antialias: true,
+  antialias: false, // Post-processing usually handles antialiasing or makes it less critical, and false is better for performance with bloom
   alpha: false,
   powerPreference: "high-performance",
+  stencil: false,
+  depth: true,
 });
-renderer.setClearColor(0x03030a, 1);
+renderer.setClearColor(0x020205, 1);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight, false);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.2;
 
 const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x020205, 0.0015);
+
 const camera = new THREE.PerspectiveCamera(
   60,
   window.innerWidth / window.innerHeight,
   0.1,
-  2000
+  4000
 );
 camera.position.set(80, 60, 100);
+
+// Post-processing
+const renderScene = new RenderPass(scene, camera);
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.5,
+  0.4,
+  0.85
+);
+bloomPass.threshold = 0.15;
+bloomPass.strength = 1.2;
+bloomPass.radius = 0.5;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(renderScene);
+composer.addPass(bloomPass);
 
 const cameraTarget = new THREE.Vector3(0, 0, 0);
 let targetRadius = 140;
@@ -37,16 +62,24 @@ let targetPan = new THREE.Vector3(0, 0, 0);
 let currentPan = new THREE.Vector3(0, 0, 0);
 let targetRoll = 0;
 let currentRoll = 0;
+let smoothedHandPos = new THREE.Vector2(0.5, 0.5);
+const desiredOrbit = new THREE.Vector2(0.4, 0.9);
+const desiredPan = new THREE.Vector3(0, 0, 0);
+const tempHand = new THREE.Vector2();
+const tempCameraPos = new THREE.Vector3();
 
 const galaxyGroup = new THREE.Group();
 galaxyGroup.rotation.x = -0.3;
 scene.add(galaxyGroup);
 
-const ambientLight = new THREE.AmbientLight(0x6b7cff, 0.45);
+const ambientLight = new THREE.AmbientLight(0x404060, 0.5); // Darker ambient
 scene.add(ambientLight);
-const keyLight = new THREE.PointLight(0xffffff, 1.1, 700);
-keyLight.position.set(120, 80, 140);
+const keyLight = new THREE.PointLight(0xffffff, 1.5, 2000);
+keyLight.position.set(200, 150, 200);
 scene.add(keyLight);
+const fillLight = new THREE.PointLight(0x8888ff, 0.8, 1500);
+fillLight.position.set(-200, 50, -200);
+scene.add(fillLight);
 
 const textureLoader = new THREE.TextureLoader();
 textureLoader.crossOrigin = "anonymous";
@@ -60,24 +93,27 @@ const starfieldTexture = textureLoader.load(
   "https://threejs.org/examples/textures/planets/starfield.jpg"
 );
 
+// Improved Background
 const skySphere = new THREE.Mesh(
-  new THREE.SphereGeometry(950, 40, 40),
+  new THREE.SphereGeometry(1500, 60, 60),
   new THREE.MeshBasicMaterial({
     map: starfieldTexture,
     side: THREE.BackSide,
+    color: 0x666666, // Dim the background slightly
   })
 );
 scene.add(skySphere);
 
-const starField = createSpiralGalaxy(12000, 220, 1.2, starSprite);
-const nebulaField = createNebulaField(3200, 180, nebulaSprite);
+// Higher density galaxy
+const starField = createSpiralGalaxy(25000, 280, 0.8, starSprite);
+const nebulaField = createNebulaField(5000, 220, nebulaSprite);
 const galaxyCore = createGalaxyCore(nebulaSprite);
 galaxyGroup.add(galaxyCore);
 galaxyGroup.add(starField.points);
 galaxyGroup.add(nebulaField.points);
 
 const celestialObjects = createCelestialObjects(textureLoader);
-celestialObjects.forEach((mesh) => galaxyGroup.add(mesh));
+celestialObjects.forEach((obj) => galaxyGroup.add(obj));
 
 const raycaster = new THREE.Raycaster();
 const grabPlane = new THREE.Plane();
@@ -112,8 +148,8 @@ const hands = new Hands({
 hands.setOptions({
   maxNumHands: 2,
   modelComplexity: 1,
-  minDetectionConfidence: 0.6,
-  minTrackingConfidence: 0.5,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.6,
 });
 hands.onResults(onResults);
 
@@ -155,7 +191,9 @@ function onResults(results) {
   overlay.width = window.innerWidth;
   overlay.height = window.innerHeight;
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
-  drawCameraCornerRect();
+  if (cameraToggle.checked) {
+    drawCameraCornerRect();
+  }
   if (!results.multiHandLandmarks) {
     return;
   }
@@ -270,6 +308,7 @@ function drawLandmarks(landmarks) {
   overlayCtx.restore();
 }
 
+// Improved Galaxy Generation
 function createSpiralGalaxy(count, maxRadius, size, sprite) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
@@ -278,27 +317,27 @@ function createSpiralGalaxy(count, maxRadius, size, sprite) {
   const velocities = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   
-  const armCount = 4;
-  const armSpread = 0.4;
-  const coreRadius = maxRadius * 0.15;
-  const diskThickness = maxRadius * 0.08;
+  const armCount = 5; // More arms for complexity
+  const armSpread = 0.5;
+  const coreRadius = maxRadius * 0.12;
+  const diskThickness = maxRadius * 0.1;
   
   for (let i = 0; i < count; i += 1) {
     let x, y, z, r, armAngle;
-    const inCore = Math.random() < 0.2;
+    const inCore = Math.random() < 0.25; // Larger core
     
     if (inCore) {
-      r = Math.random() ** 1.5 * coreRadius;
+      r = Math.random() ** 2.0 * coreRadius;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       x = r * Math.sin(phi) * Math.cos(theta);
-      y = r * Math.cos(phi);
+      y = r * Math.cos(phi) * 0.6; // Flattened core
       z = r * Math.sin(phi) * Math.sin(theta);
     } else {
-      r = coreRadius + Math.random() ** 0.6 * (maxRadius - coreRadius);
+      r = coreRadius + Math.random() ** 0.8 * (maxRadius - coreRadius);
       const armIndex = Math.floor(Math.random() * armCount);
       const armOffset = (armIndex * Math.PI * 2) / armCount;
-      const spiralTightness = 3.5;
+      const spiralTightness = 4.0;
       armAngle = armOffset + (r / maxRadius) * spiralTightness;
       const armDeviation = (Math.random() - 0.5) * armSpread;
       
@@ -306,8 +345,8 @@ function createSpiralGalaxy(count, maxRadius, size, sprite) {
       x = r * Math.cos(angle);
       z = r * Math.sin(angle);
       
-      const heightFalloff = Math.exp(-r / (maxRadius * 0.5));
-      y = (Math.random() - 0.5) * diskThickness * heightFalloff;
+      const heightFalloff = Math.exp(-r / (maxRadius * 0.4));
+      y = (Math.random() - 0.5) * diskThickness * heightFalloff * 2.0;
     }
     
     positions[i * 3] = x;
@@ -325,17 +364,17 @@ function createSpiralGalaxy(count, maxRadius, size, sprite) {
     
     let hue, sat, light;
     if (inCore) {
-      hue = 0.1 + Math.random() * 0.05;
-      sat = 0.7 + Math.random() * 0.2;
-      light = 0.75 + Math.random() * 0.15;
+      hue = 0.05 + Math.random() * 0.1; // Golden/Orange core
+      sat = 0.8 + Math.random() * 0.2;
+      light = 0.8 + Math.random() * 0.2;
     } else if (normalizedDist < 0.4) {
-      hue = 0.15 + Math.random() * 0.1;
-      sat = 0.6 + Math.random() * 0.2;
-      light = 0.7 + Math.random() * 0.2;
+      hue = 0.6 + Math.random() * 0.1; // Blue inner arms
+      sat = 0.7 + Math.random() * 0.2;
+      light = 0.6 + Math.random() * 0.2;
     } else {
-      hue = 0.55 + Math.random() * 0.15;
+      hue = 0.65 + Math.random() * 0.2; // Deep blue/purple outer
       sat = 0.5 + Math.random() * 0.3;
-      light = 0.75 + Math.random() * 0.2;
+      light = 0.5 + Math.random() * 0.3;
     }
     
     const color = new THREE.Color().setHSL(hue, sat, light);
@@ -343,7 +382,7 @@ function createSpiralGalaxy(count, maxRadius, size, sprite) {
     colors[i * 3 + 1] = color.g;
     colors[i * 3 + 2] = color.b;
     
-    sizes[i] = size * (0.5 + Math.random() * 1.5) * (inCore ? 1.4 : 1.0);
+    sizes[i] = size * (0.5 + Math.random() * 1.5) * (inCore ? 2.0 : 1.0);
   }
   
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -357,7 +396,7 @@ function createSpiralGalaxy(count, maxRadius, size, sprite) {
     transparent: true,
     depthWrite: false,
     map: sprite,
-    alphaTest: 0.2,
+    alphaTest: 0.05,
     sizeAttenuation: true,
   });
   
@@ -371,21 +410,21 @@ function createNebulaField(count, radius, sprite) {
   const colors = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   
-  const armCount = 4;
-  const diskThickness = radius * 0.15;
+  const armCount = 5;
+  const diskThickness = radius * 0.2;
   
   for (let i = 0; i < count; i += 1) {
     const r = Math.random() ** 0.8 * radius;
     const armIndex = Math.floor(Math.random() * armCount);
     const armOffset = (armIndex * Math.PI * 2) / armCount;
-    const spiralTightness = 3.5;
+    const spiralTightness = 4.0;
     const armAngle = armOffset + (r / radius) * spiralTightness;
-    const armSpread = 0.6;
+    const armSpread = 0.8;
     const angle = armAngle + (Math.random() - 0.5) * armSpread;
     
-    const x = r * Math.cos(angle) + (Math.random() - 0.5) * 15;
-    const z = r * Math.sin(angle) + (Math.random() - 0.5) * 15;
-    const heightFalloff = Math.exp(-r / (radius * 0.4));
+    const x = r * Math.cos(angle) + (Math.random() - 0.5) * 25;
+    const z = r * Math.sin(angle) + (Math.random() - 0.5) * 25;
+    const heightFalloff = Math.exp(-r / (radius * 0.5));
     const y = (Math.random() - 0.5) * diskThickness * heightFalloff;
     
     positions[i * 3] = x;
@@ -393,16 +432,16 @@ function createNebulaField(count, radius, sprite) {
     positions[i * 3 + 2] = z;
     
     const distNorm = r / radius;
-    const hue = 0.7 + Math.random() * 0.2 - distNorm * 0.1;
-    const sat = 0.5 + Math.random() * 0.3;
-    const light = 0.3 + Math.random() * 0.3;
+    const hue = 0.5 + Math.random() * 0.3 - distNorm * 0.2; // Purple to Blue
+    const sat = 0.4 + Math.random() * 0.3;
+    const light = 0.1 + Math.random() * 0.2; // Subtle
     
     const color = new THREE.Color().setHSL(hue, sat, light);
     colors[i * 3] = color.r;
     colors[i * 3 + 1] = color.g;
     colors[i * 3 + 2] = color.b;
     
-    sizes[i] = 2.0 + Math.random() * 3.0;
+    sizes[i] = 10.0 + Math.random() * 20.0;
   }
   
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -410,14 +449,14 @@ function createNebulaField(count, radius, sprite) {
   geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
   
   const material = new THREE.PointsMaterial({
-    size: 3.0,
+    size: 1.0,
     vertexColors: true,
     blending: THREE.AdditiveBlending,
     transparent: true,
     depthWrite: false,
-    opacity: 0.5,
+    opacity: 0.2, // Subtle nebula
     map: sprite,
-    alphaTest: 0.1,
+    alphaTest: 0.01,
     sizeAttenuation: true,
   });
   const points = new THREE.Points(geometry, material);
@@ -425,59 +464,86 @@ function createNebulaField(count, radius, sprite) {
 }
 
 function createGalaxyCore(sprite) {
-  const geometry = new THREE.PlaneGeometry(200, 200);
-  const material = new THREE.MeshBasicMaterial({
+  // Use a sprite for the core glow instead of a plane for better billboard effect
+  const material = new THREE.SpriteMaterial({
     map: sprite,
+    color: 0xffddaa,
     transparent: true,
     blending: THREE.AdditiveBlending,
-    opacity: 0.35,
+    opacity: 0.8,
     depthWrite: false,
   });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.rotation.x = Math.PI / 2;
-  return mesh;
+  const spriteMesh = new THREE.Sprite(material);
+  spriteMesh.scale.set(120, 120, 1);
+  return spriteMesh;
 }
 
 function createCelestialObjects(loader) {
   const objects = [];
-  const planetTextures = [
-    loader.load(
-      "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg"
-    ),
-    loader.load(
-      "https://threejs.org/examples/textures/planets/mars_1k_color.jpg"
-    ),
-    loader.load("https://threejs.org/examples/textures/planets/jupiter.jpg"),
-    loader.load(
-      "https://threejs.org/examples/textures/planets/venus_surface.jpg"
-    ),
+  const planetData = [
+    { name: "Earth", tex: "earth_atmos_2048.jpg", radius: 5, pos: [30, -5, -20] },
+    { name: "Mars", tex: "mars_1k_color.jpg", radius: 3.5, pos: [45, 2, -10] },
+    { name: "Jupiter", tex: "jupiter.jpg", radius: 9, pos: [70, -10, 10] },
+    { name: "Venus", tex: "venus_surface.jpg", radius: 4.5, pos: [20, 5, -30] },
   ];
-  for (let i = 0; i < 4; i += 1) {
-    const radius = 4 + i * 1.8;
-    const geometry = new THREE.SphereGeometry(radius, 24, 24);
+
+  planetData.forEach((data, i) => {
+    const group = new THREE.Group();
+    group.position.set(...data.pos);
+    group.userData.grabbable = true; // Make the group grabbable
+
+    // Planet Mesh
+    const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
+    const texture = loader.load(`https://threejs.org/examples/textures/planets/${data.tex}`);
     const material = new THREE.MeshStandardMaterial({
-      map: planetTextures[i % planetTextures.length],
-      emissive: 0x202040,
+      map: texture,
+      roughness: 0.7,
       metalness: 0.1,
-      roughness: 0.6,
     });
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(30 + i * 12, -10 + i * 7, -20 + i * 6);
-    mesh.userData.grabbable = true;
-    objects.push(mesh);
-  }
+    group.add(mesh);
+
+    // Atmosphere Glow
+    const atmosGeo = new THREE.SphereGeometry(data.radius * 1.2, 32, 32);
+    const atmosMat = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.7 - dot(vNormal, vec3(0, 0, 1.0)), 3.0);
+          gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity * 0.8;
+        }
+      `,
+    });
+    const atmos = new THREE.Mesh(atmosGeo, atmosMat);
+    group.add(atmos);
+
+    objects.push(group);
+  });
+
   return objects;
 }
 
 function createTrail(color) {
-  const maxPoints = 60;
+  const maxPoints = 80;
   const positions = new Float32Array(maxPoints * 3);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const material = new THREE.LineBasicMaterial({
     color,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.8,
+    linewidth: 2,
   });
   const line = new THREE.Line(geometry, material);
   line.frustumCulled = false;
@@ -510,9 +576,9 @@ function updateGestureEffects(delta) {
 function scatterStars(field, strength) {
   const positions = field.geometry.attributes.position.array;
   for (let i = 0; i < positions.length; i += 3) {
-    positions[i] += (Math.random() - 0.5) * 0.4 * strength;
-    positions[i + 1] += (Math.random() - 0.5) * 0.4 * strength;
-    positions[i + 2] += (Math.random() - 0.5) * 0.4 * strength;
+    positions[i] += (Math.random() - 0.5) * 0.8 * strength;
+    positions[i + 1] += (Math.random() - 0.5) * 0.8 * strength;
+    positions[i + 2] += (Math.random() - 0.5) * 0.8 * strength;
   }
   field.geometry.attributes.position.needsUpdate = true;
 }
@@ -528,20 +594,20 @@ function applyGravity(field, strength, delta) {
     const dx = -x;
     const dy = -y;
     const dz = -z;
-    const distSq = dx * dx + dy * dy + dz * dz + 20;
-    const pull = (strength * 12) / distSq;
+    const distSq = dx * dx + dy * dy + dz * dz + 40; // Increased damping dist
+    const pull = (strength * 20) / distSq;
     velocities[i] += dx * pull * delta;
     velocities[i + 1] += dy * pull * delta;
     velocities[i + 2] += dz * pull * delta;
-    velocities[i] *= 0.985;
-    velocities[i + 1] *= 0.985;
-    velocities[i + 2] *= 0.985;
+    velocities[i] *= 0.96; // More drag
+    velocities[i + 1] *= 0.96;
+    velocities[i + 2] *= 0.96;
     positions[i] += velocities[i];
     positions[i + 1] += velocities[i + 1];
     positions[i + 2] += velocities[i + 2];
-    positions[i] += (base[i] - positions[i]) * 0.002;
-    positions[i + 1] += (base[i + 1] - positions[i + 1]) * 0.002;
-    positions[i + 2] += (base[i + 2] - positions[i + 2]) * 0.002;
+    positions[i] += (base[i] - positions[i]) * 0.01; // Stronger return force
+    positions[i + 1] += (base[i + 1] - positions[i + 1]) * 0.01;
+    positions[i + 2] += (base[i + 2] - positions[i + 2]) * 0.01;
   }
   field.geometry.attributes.position.needsUpdate = true;
 }
@@ -554,22 +620,35 @@ function updateControls() {
 
   if (hands.length > 0) {
     const primary = hands[0];
-    const x = primary.palm.x * 2 - 1;
-    const y = primary.palm.y * 2 - 1;
-    const maxPitch = 0.8;
-    const maxYaw = 1.2;
+    tempHand.set(primary.palm.x, primary.palm.y);
+    smoothedHandPos.lerp(tempHand, 0.08);
+    const x = smoothedHandPos.x * 2 - 1;
+    const y = smoothedHandPos.y * 2 - 1;
+    const deadZone = 0.1;
+    const absX = Math.abs(x);
+    const absY = Math.abs(y);
+    const normalizedX = absX < deadZone ? 0 : (absX - deadZone) / (1 - deadZone) * Math.sign(x);
+    const normalizedY = absY < deadZone ? 0 : (absY - deadZone) / (1 - deadZone) * Math.sign(y);
+    const maxPitch = 0.55;
+    const maxYaw = 0.8;
     const mode = modeSelect.value;
     if (mode === "orbit" || mode === "hybrid") {
-      targetOrbit.x = THREE.MathUtils.clamp(-y, -1, 1) * maxPitch;
-      targetOrbit.y = THREE.MathUtils.clamp(x, -1, 1) * maxYaw;
+      desiredOrbit.x = THREE.MathUtils.clamp(-normalizedY, -1, 1) * maxPitch;
+      desiredOrbit.y = THREE.MathUtils.clamp(normalizedX, -1, 1) * maxYaw;
     }
     if (mode === "pan" || mode === "hybrid") {
-      targetPan.set(
-        THREE.MathUtils.clamp(x, -1, 1) * 18,
-        THREE.MathUtils.clamp(-y, -1, 1) * 12,
+      desiredPan.set(
+        THREE.MathUtils.clamp(normalizedX, -1, 1) * 10,
+        THREE.MathUtils.clamp(-normalizedY, -1, 1) * 7,
         0
       );
     }
+  } else {
+    tempHand.set(0.5, 0.5);
+    smoothedHandPos.lerp(tempHand, 0.05);
+    desiredOrbit.set(0.4, 0.9);
+    desiredPan.set(0, 0, 0);
+    targetRoll = THREE.MathUtils.lerp(targetRoll, 0, 0.1);
   }
 
   if (hands.length > 1) {
@@ -578,12 +657,19 @@ function updateControls() {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const roll = Math.atan2(dy, dx);
-    targetRoll = roll * 0.6;
+    targetRoll = THREE.MathUtils.lerp(targetRoll, roll * 0.35, 0.15);
     const avgX = (a.x + b.x) / 2;
     const avgY = (a.y + b.y) / 2;
-    targetOrbit.x = THREE.MathUtils.clamp(-(avgY * 2 - 1), -1, 1) * 0.9;
-    targetOrbit.y = THREE.MathUtils.clamp(avgX * 2 - 1, -1, 1) * 1.4;
+    tempHand.set(avgX, avgY);
+    smoothedHandPos.lerp(tempHand, 0.1);
+    const normalizedX = avgX * 2 - 1;
+    const normalizedY = avgY * 2 - 1;
+    desiredOrbit.x = THREE.MathUtils.clamp(-normalizedY, -1, 1) * 0.6;
+    desiredOrbit.y = THREE.MathUtils.clamp(normalizedX, -1, 1) * 0.9;
   }
+
+  targetOrbit.lerp(desiredOrbit, 0.1);
+  targetPan.lerp(desiredPan, 0.1);
 
   updateGestures();
   if (hands.length === 0) {
@@ -635,19 +721,28 @@ function updateGrab(delta) {
     if (hand.pinch) {
       if (!handState.grabbed[i]) {
         raycaster.setFromCamera(ndc, camera);
-        const hits = raycaster.intersectObjects(celestialObjects, false);
+        // Intersect recursively because we are using Groups now
+        const hits = raycaster.intersectObjects(celestialObjects, true);
         if (hits.length) {
           const hit = hits[0];
-          grabPlane.setFromNormalAndCoplanarPoint(
-            camera.getWorldDirection(new THREE.Vector3()),
-            hit.object.position
-          );
-          const intersection = new THREE.Vector3();
-          raycaster.ray.intersectPlane(grabPlane, intersection);
-          handState.grabbed[i] = {
-            object: hit.object,
-            offset: hit.object.position.clone().sub(intersection),
-          };
+          // Find the parent group if we hit a child mesh
+          let object = hit.object;
+          while(object.parent && object.parent !== galaxyGroup) {
+              object = object.parent;
+          }
+
+          if (object.userData.grabbable) {
+              grabPlane.setFromNormalAndCoplanarPoint(
+                camera.getWorldDirection(new THREE.Vector3()),
+                object.position
+              );
+              const intersection = new THREE.Vector3();
+              raycaster.ray.intersectPlane(grabPlane, intersection);
+              handState.grabbed[i] = {
+                object: object,
+                offset: object.position.clone().sub(intersection),
+              };
+          }
         }
       }
     } else {
@@ -660,17 +755,15 @@ function updateGrab(delta) {
       const intersection = new THREE.Vector3();
       raycaster.ray.intersectPlane(grabPlane, intersection);
       if (intersection) {
-        grabbed.object.position.lerp(
-          intersection.add(grabbed.offset),
-          1 - Math.pow(0.2, delta * 60)
-        );
+        const targetPos = intersection.add(grabbed.offset);
+        grabbed.object.position.lerp(targetPos, 1 - Math.pow(0.15, delta * 60));
       }
     }
   }
 }
 
 function updateCamera(delta) {
-  const damping = 1 - Math.pow(0.12, delta * 60);
+  const damping = 1 - Math.pow(0.06, delta * 60);
   currentOrbit.lerp(targetOrbit, damping);
   currentPan.lerp(targetPan, damping);
   currentRadius = THREE.MathUtils.lerp(currentRadius, targetRadius, damping);
@@ -678,40 +771,15 @@ function updateCamera(delta) {
 
   const phi = Math.PI / 2 - currentOrbit.x;
   const theta = currentOrbit.y;
-  camera.position.x =
-    currentRadius * Math.sin(phi) * Math.cos(theta) + currentPan.x;
-  camera.position.y = currentRadius * Math.cos(phi) + currentPan.y;
-  camera.position.z =
-    currentRadius * Math.sin(phi) * Math.sin(theta) + currentPan.z;
+  const newX = currentRadius * Math.sin(phi) * Math.cos(theta) + currentPan.x;
+  const newY = currentRadius * Math.cos(phi) + currentPan.y;
+  const newZ = currentRadius * Math.sin(phi) * Math.sin(theta) + currentPan.z;
+  tempCameraPos.set(newX, newY, newZ);
+  camera.position.lerp(tempCameraPos, 0.2);
   camera.lookAt(cameraTarget.clone().add(currentPan));
   camera.up.set(Math.sin(currentRoll), Math.cos(currentRoll), 0);
 }
 
-function updateTrails() {
-  const centerPlane = new THREE.Plane();
-  centerPlane.setFromNormalAndCoplanarPoint(
-    camera.getWorldDirection(new THREE.Vector3()),
-    cameraTarget.clone().add(currentPan)
-  );
-  if (handState.hands[0]) {
-    updateTrailFromHand(trailA, handState.hands[0], centerPlane);
-  } else {
-    trailA.line.visible = false;
-  }
-  if (handState.hands[1]) {
-    updateTrailFromHand(trailB, handState.hands[1], centerPlane);
-  } else {
-    trailB.line.visible = false;
-  }
-}
-
-function updateTrailFromHand(trail, hand, plane) {
-  const ndc = new THREE.Vector2(hand.palm.x * 2 - 1, -hand.palm.y * 2 + 1);
-  raycaster.setFromCamera(ndc, camera);
-  const intersection = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, intersection);
-  updateTrail(trail, intersection);
-}
 
 function distance2D(a, b) {
   const dx = a.x - b.x;
@@ -728,10 +796,10 @@ function animate(time) {
   updateCamera(delta);
   updateGestureEffects(delta);
   updateGrab(delta);
-  updateTrails();
   nebulaField.points.visible = nebulaeToggle.checked;
-  galaxyGroup.rotation.y += delta * 0.03;
-  renderer.render(scene, camera);
+  
+  // Render via composer for Bloom
+  composer.render();
   requestAnimationFrame(animate);
 }
 
@@ -740,6 +808,7 @@ requestAnimationFrame(animate);
 window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  composer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 });
